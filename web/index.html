@@ -67,13 +67,18 @@
 </main>
 <script>
 const COLORS = {joy:"var(--joy)", love:"var(--love)", sadness:"var(--sadness)", anger:"var(--anger)", fear:"var(--fear)", surprise:"var(--surprise)"};
+// Same order as DEMO.md
 const EXAMPLES = [
-  ["I can't believe I finally got the job, I'm so happy!", ""],
+  ["I just got accepted into my dream university!", ""],
+  ["I'm terrified of the exam tomorrow", ""],
+  ["I was shocked when I saw the results", ""],
   ["Oh great, another Monday. Just what I needed.", ""],
-  ["I'm scared the test results will be bad", ""],
-  ["I am not happy with how this turned out", ""],
-  ["Fine.", "My dog died this morning and I can't stop crying."],
+  ["Fine.", ""],
+  ["Fine.", "My dog died this morning."],
   ["The meeting is at 3pm.", ""],
+  ["I'm not happy with my grade", ""],
+  ["you are a sadist", ""],
+  ["Thanks a lot for ruining my weekend", ""],
 ];
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

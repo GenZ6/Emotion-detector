@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emotion Detector</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #fff; --text: #1d1d1f; --muted: #6b6b70; --line: #e4e4e0;
+    --accent: #3b5bdb; --warn-bg: #fff6e0; --warn: #8a5a00;
+    --joy: #f2b705; --love: #e8590c; --sadness: #3b5bdb; --anger: #c92a2a; --fear: #7048e8; --surprise: #0ca678;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151517; --card: #1f1f22; --text: #ececee; --muted: #9a9aa1; --line: #333338;
+            --accent: #748ffc; --warn-bg: #3a2e10; --warn: #ffd57a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  label { font-weight: 600; font-size: .9rem; display: block; margin-bottom: 6px; }
+  textarea { width: 100%; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line);
+             border-radius: 8px; padding: 10px; resize: vertical; }
+  details { margin-top: 12px; color: var(--muted); }
+  details textarea { margin-top: 8px; }
+  button { margin-top: 14px; font: inherit; font-weight: 600; background: var(--accent); color: #fff;
+           border: 0; border-radius: 8px; padding: 10px 18px; cursor: pointer; }
+  .examples { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .examples span { font-size: .85rem; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; cursor: pointer; color: var(--muted); }
+  .examples span:hover { color: var(--text); border-color: var(--muted); }
+  .summary { font-size: 1.25rem; font-weight: 600; margin: 0 0 16px; }
+  .row { display: grid; grid-template-columns: 80px 1fr 56px; gap: 10px; align-items: center; margin: 6px 0; font-size: .95rem; }
+  .track { background: var(--line); border-radius: 4px; height: 10px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 4px; transition: width .3s; }
+  .pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .meta { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; font-size: .95rem; }
+  .meta b { display: block; font-size: .8rem; color: var(--muted); font-weight: 500; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .chip { font-size: .85rem; border-radius: 6px; padding: 2px 8px; }
+  .chip.pos { background: color-mix(in srgb, var(--surprise) 18%, transparent); }
+  .chip.neg { background: color-mix(in srgb, var(--anger) 15%, transparent); text-decoration: line-through; opacity: .8; }
+  .note { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 8px 12px; margin-top: 10px; font-size: .9rem; }
+  .disclaimer { color: var(--muted); font-size: .85rem; margin-top: 14px; }
+  h3 { font-size: .9rem; margin: 18px 0 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Emotion Detector</h1>
+  <p class="sub">Predicts the <em>likely</em> sentiment and emotion behind a sentence, and how sure it is.</p>
+
+  <div class="card">
+    <label for="text">Sentence</label>
+    <textarea id="text" rows="3" placeholder="e.g. I can't believe I finally got the job!"></textarea>
+    <details>
+      <summary>Add surrounding context (optional)</summary>
+      <textarea id="context" rows="2" placeholder="What was said before, e.g. My flight got cancelled again."></textarea>
+    </details>
+    <button id="go">Analyze</button>
+    <div class="examples" id="examples"></div>
+  </div>
+
+  <div class="card" id="result" hidden></div>
+</main>
+<script>
+const COLORS = {joy:"var(--joy)", love:"var(--love)", sadness:"var(--sadness)", anger:"var(--anger)", fear:"var(--fear)", surprise:"var(--surprise)"};
+const EXAMPLES = [
+  ["I can't believe I finally got the job, I'm so happy!", ""],
+  ["Oh great, another Monday. Just what I needed.", ""],
+  ["I'm scared the test results will be bad", ""],
+  ["I am not happy with how this turned out", ""],
+  ["Fine.", "My dog died this morning and I can't stop crying."],
+  ["The meeting is at 3pm.", ""],
+];
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+EXAMPLES.forEach(([t, c]) => {
+  const s = document.createElement("span");
+  s.textContent = c ? `${t} (+context)` : t;
+  s.onclick = () => { $("text").value = t; $("context").value = c; if (c) document.querySelector("details").open = true; analyze(); };
+  $("examples").appendChild(s);
+});
+
+async function analyze() {
+  const text = $("text").value.trim();
+  if (!text) return;
+  const res = await fetch("/analyze", {method: "POST", headers: {"Content-Type": "application/json"},
+                                       body: JSON.stringify({text, context: $("context").value})});
+  const a = await res.json();
+  if (a.error) return;
+  const bars = Object.entries(a.emotion.probabilities).map(([k, p]) => `
+    <div class="row"><span>${k}</span>
+      <div class="track"><div class="fill" style="width:${(p*100).toFixed(1)}%;background:${COLORS[k]}"></div></div>
+      <span class="pct">${(p*100).toFixed(0)}%</span></div>`).join("");
+  const chips = ev => ev.map(([w, v]) => `<span class="chip ${v > 0 ? "pos" : "neg"}" title="${v > 0 ? "supports" : "argues against"} (${v.toFixed(2)})">${esc(w)}</span>`).join("");
+  const s = a.sentiment;
+  $("result").innerHTML = `
+    <p class="summary">${esc(a.summary[0].toUpperCase() + a.summary.slice(1))}</p>
+    ${bars}
+    <div class="meta">
+      <div><b>Sentiment</b>${s.label} · ${(s.confidence*100).toFixed(0)}%</div>
+      <div><b>Sarcasm chance</b>${(a.sarcasm_probability*100).toFixed(0)}%</div>
+      <div><b>Known words</b>${a.known_words}</div>
+    </div>
+    ${a.emotion.evidence.length ? `<h3>Words behind “${a.emotion.label}”</h3><div class="chips">${chips(a.emotion.evidence)}</div>` : ""}
+    ${s.evidence.length ? `<h3>Words behind “${s.label}”</h3><div class="chips">${chips(s.evidence)}</div>` : ""}
+    ${a.notes.map(n => `<div class="note">⚠ ${esc(n)}</div>`).join("")}
+    <p class="disclaimer">These are statistical guesses about likely emotions from a model trained on public datasets. They are not a reading of what anyone truly means. Struck-through words argued <em>against</em> the prediction.</p>`;
+  $("result").hidden = false;
+}
+$("go").onclick = analyze;
+$("text").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); analyze(); } });
+</script>
+</body>
+</html>
